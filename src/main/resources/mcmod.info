@@ -1,0 +1,16 @@
+[
+{
+  "modid": "inventorylogger",
+  "name": "Inventory Logger",
+  "description": "Tracks player inventories over time. Use /lastinv to view your inventory in 15 second intervals (up to 5 minutes).",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["Life"],
+  "credits": "Life",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]

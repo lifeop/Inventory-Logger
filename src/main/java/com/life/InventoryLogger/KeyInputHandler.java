@@ -41,8 +41,7 @@ public class KeyInputHandler {
             return;
         }
         
-        // Use the proper Forge method to check if keybind is pressed
-        boolean isKeyDown = openSnapshotGuiKey.isPressed();
+        boolean isKeyDown = openSnapshotGuiKey.isKeyDown();
         
         if (isKeyDown && !wasKeyDown) {
             Minecraft mc = Minecraft.getMinecraft();

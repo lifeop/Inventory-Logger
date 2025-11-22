@@ -15,11 +15,22 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 @SideOnly(Side.CLIENT)
 public class InventorySnapshotStorage {
     private static final String SNAPSHOT_DIR = "inventory_snapshots";
     private static final long MAX_AGE_MS = 604800000;
+    private static final ExecutorService fileIOExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "InventoryLogger-FileIO");
+            t.setDaemon(true);
+            return t;
+        }
+    });
     
     @SideOnly(Side.CLIENT)
     private static File getSnapshotDirectory() {
@@ -55,85 +66,94 @@ public class InventorySnapshotStorage {
             return;
         }
         
-        try {
-            List<InventorySnapshot> snapshots = loadSnapshots(world, player.getUniqueID());
-            if (snapshots == null) {
-                snapshots = new ArrayList<InventorySnapshot>();
-            }
-            
-            boolean exists = false;
-            for (InventorySnapshot s : snapshots) {
-                if (s.getTimestamp() == snapshot.getTimestamp()) {
-                    exists = true;
-                    break;
-                }
-            }
-            
-            if (!exists) {
-                snapshots.add(snapshot);
-            }
-            
-            long currentTime = System.currentTimeMillis();
-            List<InventorySnapshot> validSnapshots = new ArrayList<InventorySnapshot>();
-            for (InventorySnapshot s : snapshots) {
-                if (currentTime - s.getTimestamp() <= MAX_AGE_MS) {
-                    validSnapshots.add(s);
-                }
-            }
-            
-            java.util.Collections.sort(validSnapshots, new java.util.Comparator<InventorySnapshot>() {
-                @Override
-                public int compare(InventorySnapshot a, InventorySnapshot b) {
-                    return Long.compare(a.getTimestamp(), b.getTimestamp());
-                }
-            });
-            
-            NBTTagCompound root = new NBTTagCompound();
-            NBTTagList snapshotList = new NBTTagList();
-            
-            for (InventorySnapshot s : validSnapshots) {
-                NBTTagCompound snapshotTag = new NBTTagCompound();
-                snapshotTag.setLong("timestamp", s.getTimestamp());
-                
-                NBTTagList mainInv = new NBTTagList();
-                for (int i = 0; i < s.getMainInventory().size(); i++) {
-                    net.minecraft.item.ItemStack stack = s.getMainInventory().get(i);
-                    if (stack != null) {
-                        NBTTagCompound stackTag = new NBTTagCompound();
-                        stack.writeToNBT(stackTag);
-                        mainInv.appendTag(stackTag);
-                    } else {
-                        mainInv.appendTag(new NBTTagCompound());
+        final UUID playerUUID = player.getUniqueID();
+        final String playerName = player.getName();
+        final File finalSnapshotFile = snapshotFile;
+        final InventorySnapshot finalSnapshot = snapshot;
+        fileIOExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    List<InventorySnapshot> snapshots = loadSnapshotsInternal(playerUUID);
+                    if (snapshots == null) {
+                        snapshots = new ArrayList<InventorySnapshot>();
                     }
-                }
-                snapshotTag.setTag("mainInventory", mainInv);
-                
-                NBTTagList armorInv = new NBTTagList();
-                for (int i = 0; i < s.getArmorInventory().size(); i++) {
-                    net.minecraft.item.ItemStack stack = s.getArmorInventory().get(i);
-                    if (stack != null) {
-                        NBTTagCompound stackTag = new NBTTagCompound();
-                        stack.writeToNBT(stackTag);
-                        armorInv.appendTag(stackTag);
-                    } else {
-                        armorInv.appendTag(new NBTTagCompound());
+                    
+                    boolean exists = false;
+                    for (InventorySnapshot s : snapshots) {
+                        if (s.getTimestamp() == finalSnapshot.getTimestamp()) {
+                            exists = true;
+                            break;
+                        }
                     }
+                    
+                    if (!exists) {
+                        snapshots.add(finalSnapshot);
+                    }
+                    
+                    long currentTime = System.currentTimeMillis();
+                    List<InventorySnapshot> validSnapshots = new ArrayList<InventorySnapshot>();
+                    for (InventorySnapshot s : snapshots) {
+                        if (currentTime - s.getTimestamp() <= MAX_AGE_MS) {
+                            validSnapshots.add(s);
+                        }
+                    }
+                    
+                    java.util.Collections.sort(validSnapshots, new java.util.Comparator<InventorySnapshot>() {
+                        @Override
+                        public int compare(InventorySnapshot a, InventorySnapshot b) {
+                            return Long.compare(a.getTimestamp(), b.getTimestamp());
+                        }
+                    });
+                    
+                    NBTTagCompound root = new NBTTagCompound();
+                    NBTTagList snapshotList = new NBTTagList();
+                    
+                    for (InventorySnapshot s : validSnapshots) {
+                        NBTTagCompound snapshotTag = new NBTTagCompound();
+                        snapshotTag.setLong("timestamp", s.getTimestamp());
+                        
+                        NBTTagList mainInv = new NBTTagList();
+                        for (int i = 0; i < s.getMainInventory().size(); i++) {
+                            net.minecraft.item.ItemStack stack = s.getMainInventory().get(i);
+                            if (stack != null) {
+                                NBTTagCompound stackTag = new NBTTagCompound();
+                                stack.writeToNBT(stackTag);
+                                mainInv.appendTag(stackTag);
+                            } else {
+                                mainInv.appendTag(new NBTTagCompound());
+                            }
+                        }
+                        snapshotTag.setTag("mainInventory", mainInv);
+                        
+                        NBTTagList armorInv = new NBTTagList();
+                        for (int i = 0; i < s.getArmorInventory().size(); i++) {
+                            net.minecraft.item.ItemStack stack = s.getArmorInventory().get(i);
+                            if (stack != null) {
+                                NBTTagCompound stackTag = new NBTTagCompound();
+                                stack.writeToNBT(stackTag);
+                                armorInv.appendTag(stackTag);
+                            } else {
+                                armorInv.appendTag(new NBTTagCompound());
+                            }
+                        }
+                        snapshotTag.setTag("armorInventory", armorInv);
+                        
+                        snapshotList.appendTag(snapshotTag);
+                    }
+                    
+                    root.setTag("snapshots", snapshotList);
+                    
+                    FileOutputStream fos = new FileOutputStream(finalSnapshotFile);
+                    net.minecraft.nbt.CompressedStreamTools.writeCompressed(root, fos);
+                    fos.close();
+                    
+                } catch (IOException e) {
+                    System.err.println("Failed to save inventory snapshot for player " + playerName + ": " + e.getMessage());
+                    e.printStackTrace();
                 }
-                snapshotTag.setTag("armorInventory", armorInv);
-                
-                snapshotList.appendTag(snapshotTag);
             }
-            
-            root.setTag("snapshots", snapshotList);
-            
-            FileOutputStream fos = new FileOutputStream(snapshotFile);
-            net.minecraft.nbt.CompressedStreamTools.writeCompressed(root, fos);
-            fos.close();
-            
-        } catch (IOException e) {
-            System.err.println("Failed to save inventory snapshot for player " + player.getName() + ": " + e.getMessage());
-            e.printStackTrace();
-        }
+        });
     }
     
     @SideOnly(Side.CLIENT)
@@ -141,7 +161,11 @@ public class InventorySnapshotStorage {
         if (world == null || playerUUID == null) {
             return new ArrayList<InventorySnapshot>();
         }
-        
+        return loadSnapshotsInternal(playerUUID);
+    }
+    
+    @SideOnly(Side.CLIENT)
+    private static List<InventorySnapshot> loadSnapshotsInternal(UUID playerUUID) {
         File snapshotFile = getPlayerSnapshotFile(playerUUID);
         if (snapshotFile == null || !snapshotFile.exists()) {
             return new ArrayList<InventorySnapshot>();

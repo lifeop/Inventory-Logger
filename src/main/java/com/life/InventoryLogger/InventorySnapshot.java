@@ -20,9 +20,7 @@ public class InventorySnapshot {
         for (int i = 0; i < player.inventory.mainInventory.length; i++) {
             ItemStack stack = player.inventory.mainInventory[i];
             if (stack != null) {
-                net.minecraft.nbt.NBTTagCompound nbt = new net.minecraft.nbt.NBTTagCompound();
-                stack.writeToNBT(nbt);
-                this.mainInventory.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(nbt));
+                this.mainInventory.add(stack.copy());
             } else {
                 this.mainInventory.add(null);
             }
@@ -31,9 +29,7 @@ public class InventorySnapshot {
         for (int i = 0; i < player.inventory.armorInventory.length; i++) {
             ItemStack stack = player.inventory.armorInventory[i];
             if (stack != null) {
-                net.minecraft.nbt.NBTTagCompound nbt = new net.minecraft.nbt.NBTTagCompound();
-                stack.writeToNBT(nbt);
-                this.armorInventory.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(nbt));
+                this.armorInventory.add(stack.copy());
             } else {
                 this.armorInventory.add(null);
             }
@@ -50,9 +46,7 @@ public class InventorySnapshot {
         if (mainInventory != null) {
             for (ItemStack stack : mainInventory) {
                 if (stack != null) {
-                    net.minecraft.nbt.NBTTagCompound nbt = new net.minecraft.nbt.NBTTagCompound();
-                    stack.writeToNBT(nbt);
-                    this.mainInventory.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(nbt));
+                    this.mainInventory.add(stack.copy());
                 } else {
                     this.mainInventory.add(null);
                 }
@@ -62,9 +56,7 @@ public class InventorySnapshot {
         if (armorInventory != null) {
             for (ItemStack stack : armorInventory) {
                 if (stack != null) {
-                    net.minecraft.nbt.NBTTagCompound nbt = new net.minecraft.nbt.NBTTagCompound();
-                    stack.writeToNBT(nbt);
-                    this.armorInventory.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(nbt));
+                    this.armorInventory.add(stack.copy());
                 } else {
                     this.armorInventory.add(null);
                 }

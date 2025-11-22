@@ -116,7 +116,6 @@ public class InventorySnapshotDisplay implements IInventory {
     
     @Override
     public void clear() {
-        // Read only
     }
     
     @Override

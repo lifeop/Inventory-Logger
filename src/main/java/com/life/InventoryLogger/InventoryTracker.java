@@ -203,9 +203,7 @@ public class InventoryTracker {
                 
                 for (net.minecraft.item.ItemStack stack : snapshot.getMainInventory()) {
                     if (stack != null) {
-                        net.minecraft.nbt.NBTTagCompound nbt = new net.minecraft.nbt.NBTTagCompound();
-                        stack.writeToNBT(nbt);
-                        mainInvCopy.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(nbt));
+                        mainInvCopy.add(stack.copy());
                     } else {
                         mainInvCopy.add(null);
                     }
@@ -213,9 +211,7 @@ public class InventoryTracker {
                 
                 for (net.minecraft.item.ItemStack stack : snapshot.getArmorInventory()) {
                     if (stack != null) {
-                        net.minecraft.nbt.NBTTagCompound nbt = new net.minecraft.nbt.NBTTagCompound();
-                        stack.writeToNBT(nbt);
-                        armorInvCopy.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(nbt));
+                        armorInvCopy.add(stack.copy());
                     } else {
                         armorInvCopy.add(null);
                     }

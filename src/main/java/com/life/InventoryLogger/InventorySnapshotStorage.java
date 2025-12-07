@@ -117,8 +117,8 @@ public class InventorySnapshotStorage {
                         for (int i = 0; i < s.getMainInventory().size(); i++) {
                             net.minecraft.item.ItemStack stack = s.getMainInventory().get(i);
                             if (stack != null) {
-                                NBTTagCompound stackTag = new NBTTagCompound();
-                                stack.writeToNBT(stackTag);
+                                // Only save enchantments and basic item info (item name is determined by item ID)
+                                NBTTagCompound stackTag = serializeItemStackMinimal(stack);
                                 mainInv.appendTag(stackTag);
                             } else {
                                 mainInv.appendTag(new NBTTagCompound());
@@ -130,8 +130,8 @@ public class InventorySnapshotStorage {
                         for (int i = 0; i < s.getArmorInventory().size(); i++) {
                             net.minecraft.item.ItemStack stack = s.getArmorInventory().get(i);
                             if (stack != null) {
-                                NBTTagCompound stackTag = new NBTTagCompound();
-                                stack.writeToNBT(stackTag);
+                                // Only save enchantments and basic item info (item name is determined by item ID)
+                                NBTTagCompound stackTag = serializeItemStackMinimal(stack);
                                 armorInv.appendTag(stackTag);
                             } else {
                                 armorInv.appendTag(new NBTTagCompound());
@@ -190,7 +190,8 @@ public class InventorySnapshotStorage {
                     if (stackTag.hasNoTags()) {
                         mainInv.add(null);
                     } else {
-                        mainInv.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(stackTag));
+                        // Load only enchantments and basic item info (item name is determined by item ID)
+                        mainInv.add(deserializeItemStackMinimal(stackTag));
                     }
                 }
                 
@@ -201,7 +202,8 @@ public class InventorySnapshotStorage {
                     if (stackTag.hasNoTags()) {
                         armorInv.add(null);
                     } else {
-                        armorInv.add(net.minecraft.item.ItemStack.loadItemStackFromNBT(stackTag));
+                        // Load only enchantments and basic item info (item name is determined by item ID)
+                        armorInv.add(deserializeItemStackMinimal(stackTag));
                     }
                 }
                 
@@ -216,5 +218,75 @@ public class InventorySnapshotStorage {
             e.printStackTrace();
             return new ArrayList<InventorySnapshot>();
         }
+    }
+    
+    /**
+     * Serialize an ItemStack to NBT with only enchantments and basic item info.
+     * Item name is determined by item ID, so it doesn't need to be stored.
+     */
+    @SideOnly(Side.CLIENT)
+    private static NBTTagCompound serializeItemStackMinimal(net.minecraft.item.ItemStack stack) {
+        if (stack == null || stack.getItem() == null) {
+            return new NBTTagCompound();
+        }
+        
+        NBTTagCompound tag = new NBTTagCompound();
+        
+        // Store basic item info (item ID determines the item name)
+        tag.setShort("id", (short) net.minecraft.item.Item.getIdFromItem(stack.getItem()));
+        tag.setByte("Count", (byte) stack.stackSize);
+        tag.setShort("Damage", (short) stack.getItemDamage());
+        
+        // Get the stack's NBT compound (create if it doesn't exist)
+        NBTTagCompound stackNBT = stack.getTagCompound();
+        if (stackNBT != null) {
+            // Copy only enchantments if they exist
+            if (stackNBT.hasKey("ench", 9)) {
+                NBTTagList enchants = stackNBT.getTagList("ench", 10);
+                tag.setTag("ench", enchants.copy());
+            }
+        }
+        
+        return tag;
+    }
+    
+    /**
+     * Deserialize an ItemStack from NBT with only enchantments and basic item info.
+     * Item name is determined by the item ID.
+     */
+    @SideOnly(Side.CLIENT)
+    private static net.minecraft.item.ItemStack deserializeItemStackMinimal(NBTTagCompound tag) {
+        if (tag == null || tag.hasNoTags()) {
+            return null;
+        }
+        
+        // Load basic item info
+        short id = tag.getShort("id");
+        byte count = tag.getByte("Count");
+        short damage = tag.getShort("Damage");
+        
+        // Check if item ID is valid
+        net.minecraft.item.Item item = net.minecraft.item.Item.getItemById(id);
+        if (item == null) {
+            return null;
+        }
+        
+        net.minecraft.item.ItemStack stack = new net.minecraft.item.ItemStack(item, count, damage);
+        
+        // Create NBT compound for the stack
+        NBTTagCompound stackNBT = new NBTTagCompound();
+        
+        // Copy only enchantments if they exist
+        if (tag.hasKey("ench", 9)) {
+            NBTTagList enchants = tag.getTagList("ench", 10);
+            stackNBT.setTag("ench", enchants.copy());
+        }
+        
+        // Set the NBT compound on the stack
+        if (!stackNBT.hasNoTags()) {
+            stack.setTagCompound(stackNBT);
+        }
+        
+        return stack;
     }
 }
